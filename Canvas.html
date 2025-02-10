@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enhanced Drawing Canvas</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+    }
+
+    #controls {
+      margin: 20px;
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      color: #fff;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    #clear {
+      background-color: #ff4d4d;
+    }
+
+    #save {
+      background-color: #4caf50;
+    }
+
+    #undo {
+      background-color: #ffa500;
+    }
+
+    #redo {
+      background-color: #007bff;
+    }
+
+    canvas {
+      border: 2px solid #333;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      cursor: crosshair;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <button id="undo">Undo</button>
+    <button id="redo">Redo</button>
+    <button id="clear">Clear</button>
+    <button id="save">Save</button>
+  </div>
+  <canvas id="drawingCanvas" width="800" height="600"></canvas>
+
+  <script>
+    const canvas = document.getElementById('drawingCanvas');
+    const ctx = canvas.getContext('2d');
+    const clearButton = document.getElementById('clear');
+    const saveButton = document.getElementById('save');
+    const undoButton = document.getElementById('undo');
+    const redoButton = document.getElementById('redo');
+
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    const undoStack = [];
+    const redoStack = [];
+
+    function startDrawing(e) {
+      isDrawing = true;
+      [lastX, lastY] = [e.offsetX, e.offsetY];
+    }
+
+    function draw(e) {
+      if (!isDrawing) return;
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.closePath();
+      [lastX, lastY] = [e.offsetX, e.offsetY];
+    }
+
+    function stopDrawing() {
+      if (isDrawing) {
+        isDrawing = false;
+        saveState();
+      }
+    }
+
+    function saveState() {
+      undoStack.push(canvas.toDataURL());
+      redoStack.length = 0; // Clear redo stack when a new action is taken
+    }
+
+    function restoreState(imageData) {
+      const img = new Image();
+      img.src = imageData;
+      img.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+      };
+    }
+
+    // Undo operation
+    undoButton.addEventListener('click', () => {
+      if (undoStack.length > 0) {
+        redoStack.push(undoStack.pop());
+        const prevState = undoStack[undoStack.length - 1];
+        if (prevState) {
+          restoreState(prevState);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+    });
+
+    // Redo operation
+    redoButton.addEventListener('click', () => {
+      if (redoStack.length > 0) {
+        const redoState = redoStack.pop();
+        undoStack.push(redoState);
+        restoreState(redoState);
+      }
+    });
+
+    // Clear canvas
+    clearButton.addEventListener('click', () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      saveState();
+    });
+
+    // Save drawing
+    saveButton.addEventListener('click', () => {
+      const dataURL = canvas.toDataURL();
+      fetch('save_drawing.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `drawingData=${encodeURIComponent(dataURL)}`,
+      })
+        .then(response => response.text())
+        .then(result => {
+          alert(result);
+        })
+        .catch(error => {
+          console.error('Error:', error);
+        });
+    });
+
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+
+    // Save initial blank state
+    saveState();
+  </script>
+</body>
+</html>
+```
